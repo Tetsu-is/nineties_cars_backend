@@ -1,4 +1,1 @@
 package rest
-
-
-type Manufacturer 
