@@ -7,11 +7,12 @@ import (
 	"nineties/handler/router"
 	"os"
 	"os/signal"
+	"time"
 )
 
 func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
-	defer cancel()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
+	defer stop()
 
 	const (
 		defaultPort   = "8080"
@@ -33,6 +34,27 @@ func main() {
 
 	errCh := make(chan error)
 
-	// go func() {
-	// }
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			errCh <- err
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		shutDownWithTimeout(&server, 20)
+	case err := <-errCh:
+		panic(err)
+	}
+
+	stop()
+}
+
+func shutDownWithTimeout(srv *http.Server, timeout int) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		panic(err)
+	}
 }
